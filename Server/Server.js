@@ -4,6 +4,7 @@
 
 // Modules
 const express = require('express')
+const bodyParser = require('body-parser')
 const mysql = require('mysql')
 const fs = require('fs')
 
@@ -19,12 +20,15 @@ var sqlConn = mysql.createConnection({
     user: settings.sql.accounts.user,
     password: settings.sql.accounts.password,
 })
-
-var clientConn;
+var clientConn
 
 sqlConn.connect(function(err) {
+    if (err) throw err;
+    console.log('[SQL] Established SQL Connection Successfully.')
+
     function connectClient() {
         console.log('[SQL] Attempting to establish connection to Client Database...')
+
         clientConn = mysql.createConnection({
             host: settings.sql.accounts.host,
             user: settings.sql.accounts.user,
@@ -34,35 +38,85 @@ sqlConn.connect(function(err) {
 
         clientConn.connect(function(err){
             if(err) throw err;
-            console.log('[SQL] Established Client Connection Successfully.')
+            console.log('[SQL.Client] Established Client Connection Successfully.')
+
+            const accountsTable = 'CREATE TABLE IF NOT EXISTS accounts (username VARCHAR(32) NOT NULL,usertag VARCHAR(4) NOT NULL,password VARCHAR(255) NOT NULL, CONSTRAINT pkey PRIMARY KEY (username, usertag));'
+            clientConn.query(accountsTable, function(err, result) {
+                if (err) throw err
+                console.log('[SQL.Client] Handled accounts Table...')
+            })
         })
     }
 
-    if (err) throw err;
-    console.log('[SQL] Established SQL Connection Successfully.')
-
-    sqlConn.query("CREATE DATABASE client", function(err, result) {
-        connectClient();
-
+    sqlConn.query("CREATE DATABASE IF NOT EXISTS client", function(err, result) {
         if (err && err.code == 'ER_DB_CREATE_EXISTS') {return} else if (err && err.code != 'ER_DB_CREATE_EXISTS' ) { throw err }
-        console.log('[SQL] Created Database... (client)')
+        console.log('[SQL] Handled Client Database...')
+        connectClient()
     })
 })
+
+// Shorthand SQL Functions
+function A(Database, tableName, recordName, recordValue){
+    
+}
 
 // Start Server
 console.log('[SERVER] Attempting to Start Server')
 
 const app = express()
+app.use(bodyParser.json())
 
-app.get('/account/exist/:userName/:userTag', (request, response) => {
-    if (!request.params.userName || !request.params.userTag) { response.status(400).end(); return }
+// Endpoint: /account/exist
+// Returns: boolean
+// Body: { "userName": "", "userTag": "" }
+// Checks if Account Exists in Database.
+app.get('/account/exist', (request, response) => {
+    const userName = request.body.userName
+    const userTag = request.body.userTag
+    if (!userName || !userTag) { response.status(400).end(); return }
 
-    sqlConn.query(`SELECT EXISTS (\nSELECT 1\nFROM information_schema.tables\nWHERE table_schema = 'client'\nAND table_name = '${request.params.userName}${request.params.userTag}');`, function(err, result) {
+    clientConn.query(`SELECT * FROM accounts WHERE EXISTS (SELECT username FROM accounts WHERE accounts.username = "${userName}" AND accounts.usertag = "${userTag}");`, function(err, result) {
         if (err) throw err;
-        const translatedValue = Object.values(JSON.parse(JSON.stringify(result[0])))
-
-        if (translatedValue==0) { response.send(false) } else { response.send(true) }
+        const translatedValue = JSON.parse(JSON.stringify(result))[0]
+        if (translatedValue == undefined) {
+            response.send(false)
+        } else { response.send(true) }
     })
+
+})
+
+// Endpoint: /account/register
+// Returns: boolean/code
+// Body: { "userName": "", "userTag": "", "password": "" }
+// Registers a New Account.
+app.post('/account/register', (request, response) => {
+    const userName = request.body.userName
+    const userTag = request.body.userTag
+    const password = request.body.password
+    if (!userName || !userTag || !password) { response.status(400).end(); return }
+
+    // Check if we have account with these already
+    clientConn.query(`SELECT * FROM accounts WHERE EXISTS (SELECT username FROM accounts WHERE accounts.username = "${userName}" AND accounts.usertag = "${userTag}");`, function(err, result) {
+        if (err) throw err;
+        const translatedValue = JSON.parse(JSON.stringify(result))[0] // Translate RDP
+        if (translatedValue == undefined) {
+
+            // Doesn't exist, create
+            const hashedPassword = password // TODO: Hash
+            clientConn.query(`INSERT INTO accounts VALUES ('${userName}', '${userTag}', '${hashedPassword}')`, function(err, result) { 
+                if (err) throw err;
+                response.send(true)
+            })
+
+        } else {
+
+            // Does exist, deny
+            response.status(409).send() // Conflict
+
+        }
+    })
+
+    
 
 })
 
