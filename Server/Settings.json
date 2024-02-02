@@ -1,0 +1,10 @@
+{
+    "port": 3000,
+    "sql": {
+        "accounts": {
+            "host": "localhost",
+            "user": "root",
+            "password": "Ceilingfan1!"
+        }
+    }
+}

@@ -1,0 +1,26 @@
+{
+  "dependencies": {
+    "express": "^4.18.2",
+    "mysql": "^2.18.1"
+  },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "name": "nimbus-server",
+  "version": "1.0.0",
+  "description": "Server-Side Application for Nimbus",
+  "main": "Server.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GriffinDalby/Nimbus.git"
+  },
+  "keywords": [
+    "nimbus"
+  ],
+  "author": "Griffin E. Dalby",
+  "license": "GPL-3.0-or-later",
+  "bugs": {
+    "url": "https://github.com/GriffinDalby/Nimbus/issues"
+  },
+  "homepage": "https://github.com/GriffinDalby/Nimbus#readme"
+}
